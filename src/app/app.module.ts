@@ -16,6 +16,12 @@ import {ToolboxComponent} from './components/toolbox/toolbox.component';
 import {FormBuilderComponent} from './components/form-builder/form-builder.component';
 import {FormCanvasComponent} from './components/form-canvas/form-canvas.component';
 import {PropertiesPanelComponent} from './components/properties-panel/properties-panel.component';
+import {FormsModule} from '@angular/forms';
+import {MatSlideToggle} from '@angular/material/slide-toggle';
+import {MatTab, MatTabGroup} from '@angular/material/tabs';
+import {MatOption} from '@angular/material/core';
+import {MatSelect} from '@angular/material/select';
+import {MatTooltip} from '@angular/material/tooltip';
 
 @NgModule({
   declarations: [
@@ -35,7 +41,13 @@ import {PropertiesPanelComponent} from './components/properties-panel/properties
     MatButtonModule,
     DragDropModule,
     MatExpansionModule,
-    MatIconModule
+    FormsModule,
+    MatSlideToggle,
+    MatTab,
+    MatTabGroup,
+    MatOption,
+    MatSelect,
+    MatTooltip
   ],
   providers: [],
   bootstrap: [AppComponent]

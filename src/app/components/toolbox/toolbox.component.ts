@@ -2,18 +2,27 @@ import { Component } from '@angular/core';
 import {CdkDragStart} from '@angular/cdk/drag-drop';
 import {FormElement} from '../../models/form-element.model';
 
-
-
 @Component({
   selector: 'app-toolbox',
   template: `
     <div class="toolbox-container">
+      <!-- Secciones del toolbox -->
       <div class="section" *ngFor="let section of sections">
-        <h3 class="section-title">{{section}}</h3>
+        <!-- Título de la sección -->
+        <h3 class="section-title">
+          <mat-icon class="section-icon">
+            {{getSectionIcon(section)}}
+          </mat-icon>
+          {{section}}
+        </h3>
+
+        <!-- Lista de elementos -->
         <div class="elements-list"
              cdkDropList
              [cdkDropListConnectedTo]="['form-canvas']"
              [cdkDropListData]="getElementsBySection(section)">
+
+          <!-- Elementos individuales -->
           <div *ngFor="let element of getElementsBySection(section)"
                class="element-item"
                cdkDrag
@@ -30,16 +39,29 @@ import {FormElement} from '../../models/form-element.model';
       padding: 16px;
       background: white;
       height: 100%;
+      overflow-y: auto;
     }
 
     .section {
-      margin-bottom: 20px;
+      margin-bottom: 24px;
     }
 
     .section-title {
       font-weight: 500;
       margin-bottom: 12px;
       color: #333;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+
+    .section-icon {
+      color: #666;
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
     }
 
     .elements-list {
@@ -51,13 +73,14 @@ import {FormElement} from '../../models/form-element.model';
     .element-item {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 8px;
+      gap: 12px;
+      padding: 10px 12px;
       border: 1px solid #e0e0e0;
       border-radius: 4px;
       cursor: move;
       background: white;
       transition: all 0.2s ease;
+      user-select: none;
     }
 
     .element-item:hover {
@@ -65,8 +88,16 @@ import {FormElement} from '../../models/form-element.model';
       border-color: #2196f3;
     }
 
-    mat-icon {
+    .element-item mat-icon {
       color: #666;
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+
+    .element-item span {
+      font-size: 14px;
+      color: #333;
     }
   `],
   standalone: false
@@ -75,6 +106,7 @@ export class ToolboxComponent {
   sections = ['Contactos', 'General'];
 
   formElements: FormElement[] = [
+    // Sección General
     {
       id: 'text',
       type: 'text',
@@ -91,6 +123,7 @@ export class ToolboxComponent {
       section: 'General',
       placeholder: 'Escribe tu respuesta detallada'
     },
+    // Sección Contactos
     {
       id: 'name',
       type: 'text',
@@ -111,6 +144,14 @@ export class ToolboxComponent {
 
   getElementsBySection(section: string): FormElement[] {
     return this.formElements.filter(element => element.section === section);
+  }
+
+  getSectionIcon(section: string): string {
+    const sectionIcons: { [key: string]: string } = {
+      'Contactos': 'contacts',
+      'General': 'dashboard'
+    };
+    return sectionIcons[section] || 'folder';
   }
 
   onDragStarted(event: CdkDragStart, element: FormElement) {
