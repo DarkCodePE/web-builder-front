@@ -1,4 +1,4 @@
-import {Component, ElementRef, OnInit, ViewChild} from '@angular/core';
+import {Component, ElementRef, EventEmitter, OnInit, Output, ViewChild} from '@angular/core';
 import {CdkDragDrop, CdkDragEnter, CdkDragMove, moveItemInArray, transferArrayItem} from '@angular/cdk/drag-drop';
 import { FormElement } from '../../models/form-element.model';
 
@@ -11,55 +11,111 @@ interface DropGuide {
 @Component({
   selector: 'app-form-canvas',
   template: `
-    <div class="canvas-outer-container" #canvasContainer>
-      <div class="canvas-scroll-container">
-        <div class="form-preview">
-          <h2 class="form-title">Get a Price Quote</h2>
+    <div class="canvas-container">
+      <div class="form-preview">
+        <div class="form-fields-container"
+             cdkDropList
+             #formCanvasList="cdkDropList"
+             id="form-canvas-list"
+             [cdkDropListData]="formFields"
+             [cdkDropListConnectedTo]="['toolboxList']"
+             (cdkDropListDropped)="onDrop($event)">
 
-          <div class="form-fields-container"
-               cdkDropList
-               #dropList="cdkDropList"
-               [cdkDropListData]="formFields"
-               (cdkDropListDropped)="onDrop($event)">
+          <!-- Mensaje cuando no hay campos -->
+          <div *ngIf="formFields.length === 0" class="empty-state">
+            <p>Arrastra elementos aquí para comenzar</p>
+          </div>
 
-            <div *ngFor="let field of formFields; let i = index"
-                 class="field-wrapper"
-                 [attr.data-index]="i"
-                 cdkDrag
-                 [cdkDragData]="field">
+          <div *ngFor="let field of formFields; let i = index"
+               class="field-wrapper"
+               [class.selected]="selectedField?.id === field.id"
+               (click)="selectField(field, $event)"
+               cdkDrag
+               [cdkDragData]="field">
 
-              <!-- Preview mientras se arrastra -->
-              <div *cdkDragPreview class="drag-preview">
-                <mat-icon>{{field.icon}}</mat-icon>
-                <span>{{field.label}}</span>
+            <!-- Barra de herramientas -->
+            <div class="field-toolbar" *ngIf="selectedField?.id === field.id">
+              <div class="toolbar-group">
+                <button mat-icon-button matTooltip="Reordenar" cdkDragHandle>
+                  <mat-icon>drag_indicator</mat-icon>
+                </button>
+                <button mat-icon-button matTooltip="Ajustes"
+                        (click)="openSettings(field, $event)">
+                  <mat-icon>settings</mat-icon>
+                </button>
+                <button mat-icon-button matTooltip="Duplicar"
+                        (click)="duplicateField(field, $event)">
+                  <mat-icon>content_copy</mat-icon>
+                </button>
+                <button mat-icon-button matTooltip="Eliminar"
+                        (click)="removeField(i, $event)">
+                  <mat-icon>delete</mat-icon>
+                </button>
               </div>
-
-              <!-- Placeholder mientras se arrastra -->
-              <div *cdkDragPlaceholder class="field-placeholder"></div>
-
-              <!-- Contenido real del campo -->
-              <div [ngSwitch]="field.type" class="field-content">
-                <div *ngSwitchCase="'text'" class="form-field">
-                  <label class="field-label">{{field.label}}</label>
-                  <input type="text"
-                         [placeholder]="field.placeholder || ''"
-                         class="field-input">
-                </div>
-                <div *ngSwitchCase="'email'" class="form-field">
-                  <label class="field-label">{{field.label}}</label>
-                  <input type="email"
-                         [placeholder]="field.placeholder || ''"
-                         class="field-input">
-                </div>
-                <!-- Otros tipos de campos aquí -->
-              </div>
+              <button mat-icon-button
+                      matTooltip="Cerrar"
+                      (click)="closeToolbar($event)"
+                      class="close-button">
+                <mat-icon>close</mat-icon>
+              </button>
             </div>
 
-            <!-- Área vacía para drop cuando no hay campos -->
-            <div *ngIf="formFields.length === 0"
-                 class="empty-state">
-              <mat-icon>add_circle_outline</mat-icon>
-              <p>Arrastra elementos aquí para comenzar</p>
+            <!-- Contenido del campo -->
+            <div class="field-content" [ngSwitch]="field.type">
+              <!-- Campo de texto -->
+              <div *ngSwitchCase="'text'" class="form-field">
+                <label class="field-label">{{field.label}}</label>
+                <input type="text" [placeholder]="field.placeholder || ''" class="field-input">
+              </div>
+
+              <!-- Campo de email -->
+              <div *ngSwitchCase="'email'" class="form-field">
+                <label class="field-label">{{field.label}}</label>
+                <input type="email" [placeholder]="field.placeholder || ''" class="field-input">
+              </div>
+
+              <!-- Campo de texto largo -->
+              <div *ngSwitchCase="'textarea'" class="form-field">
+                <label class="field-label">{{field.label}}</label>
+                <textarea [placeholder]="field.placeholder || ''" class="field-textarea"></textarea>
+              </div>
+              <!-- Lista desplegable -->
+              <div *ngSwitchCase="'select'" class="form-field">
+                <label class="field-label">{{field.label}}</label>
+                <select class="field-select" [multiple]="field.multiple">
+                  <option value="" disabled selected>{{field.placeholder}}</option>
+                  <option *ngFor="let option of field.options" [value]="option">
+                    {{option}}
+                  </option>
+                </select>
+              </div>
+
+              <!-- Casillas de verificación -->
+              <div *ngSwitchCase="'checkbox'" class="form-field">
+                <label class="field-label">{{field.label}}</label>
+                <div class="options-container" [class.horizontal]="field.layout === 'horizontal'">
+                  <div class="checkbox-option" *ngFor="let option of field.options">
+                    <label class="checkbox-label">
+                      <input type="checkbox" [value]="option">
+                      <span>{{option}}</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Botones de radio -->
+              <div *ngSwitchCase="'radio'" class="form-field">
+                <label class="field-label">{{field.label}}</label>
+                <div class="options-container" [class.horizontal]="field.layout === 'horizontal'">
+                  <div class="radio-option" *ngFor="let option of field.options">
+                    <label class="radio-label">
+                      <input type="radio" [name]="field.id" [value]="option">
+                      <span>{{option}}</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
@@ -67,19 +123,11 @@ interface DropGuide {
     </div>
   `,
   styles: [`
-    .canvas-outer-container {
-      height: 100%;
-      position: relative;
-      background-color: #f5f5f5;
-      overflow: hidden;
-    }
-
-    .canvas-scroll-container {
+    .canvas-container {
       height: 100%;
       padding: 20px;
+      background-color: #f5f5f5;
       overflow-y: auto;
-      overflow-x: hidden;
-      box-sizing: border-box;
     }
 
     .form-preview {
@@ -87,21 +135,7 @@ interface DropGuide {
       border-radius: 8px;
       padding: 24px;
       min-height: 500px;
-      max-width: 800px;
-      margin: 0 auto;
       box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    .form-title {
-      font-size: 24px;
-      font-weight: 600;
-      margin-bottom: 24px;
-      color: #2c3e50;
-      position: sticky;
-      top: 0;
-      background: white;
-      padding: 16px 0;
-      z-index: 10;
     }
 
     .form-fields-container {
@@ -112,18 +146,41 @@ interface DropGuide {
     }
 
     .field-wrapper {
-      background: white;
+      position: relative;
       border: 1px solid #e0e0e0;
       border-radius: 4px;
+      background: white;
       transition: all 0.2s ease;
-      position: relative;
-      width: 100%;
-      box-sizing: border-box;
     }
 
     .field-wrapper:hover {
       border-color: #2196f3;
-      box-shadow: 0 2px 4px rgba(33, 150, 243, 0.1);
+    }
+
+    .field-wrapper.selected {
+      border: 2px solid #2196f3;
+    }
+
+    .field-toolbar {
+      position: absolute;
+      top: -40px;
+      left: 0;
+      right: 0;
+      height: 40px;
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px 4px 0 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 8px;
+      box-shadow: 0 -2px 4px rgba(0,0,0,0.05);
+      z-index: 10;
+    }
+
+    .toolbar-group {
+      display: flex;
+      gap: 4px;
     }
 
     .field-content {
@@ -138,80 +195,145 @@ interface DropGuide {
       color: #2c3e50;
     }
 
-    .field-input {
+    .field-input, .field-textarea {
       width: 100%;
       padding: 8px 12px;
       border: 1px solid #e0e0e0;
       border-radius: 4px;
       font-size: 14px;
-      box-sizing: border-box;
-    }
-
-    .drag-preview {
-      padding: 12px;
-      background: white;
-      border-radius: 4px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      max-width: 300px;
-    }
-
-    .field-placeholder {
-      background: #f5f5f5;
-      border: 2px dashed #ccc;
-      border-radius: 4px;
-      height: 60px;
-      margin: 8px 0;
     }
 
     .empty-state {
       text-align: center;
       padding: 40px;
-      color: #666;
       border: 2px dashed #ccc;
       border-radius: 4px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
+      color: #666;
+    }
+
+    .cdk-drag-preview {
+      box-sizing: border-box;
+      border-radius: 4px;
+      box-shadow: 0 5px 5px -3px rgba(0, 0, 0, 0.2),
+      0 8px 10px 1px rgba(0, 0, 0, 0.14),
+      0 3px 14px 2px rgba(0, 0, 0, 0.12);
+    }
+
+    .cdk-drag-placeholder {
+      opacity: 0.3;
     }
 
     .cdk-drag-animating {
       transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
     }
 
-    .cdk-drop-list-dragging .field-wrapper:not(.cdk-drag-placeholder) {
-      transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+    .field-textarea {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      font-size: 14px;
+      resize: vertical;
+    }
+
+    .field-select {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      font-size: 14px;
+      background-color: white;
+    }
+
+    .options-container {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .options-container.horizontal {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .checkbox-option, .radio-option {
+      display: flex;
+      align-items: center;
+    }
+
+    .checkbox-label, .radio-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    input[type="checkbox"], input[type="radio"] {
+      cursor: pointer;
     }
   `],
   standalone: false
 })
 export class FormCanvasComponent {
-  @ViewChild('canvasContainer') canvasContainer!: ElementRef;
+  @Output() fieldSelected = new EventEmitter<FormElement>();
+  @Output() fieldSettingsRequested = new EventEmitter<FormElement>();
+
   formFields: FormElement[] = [];
+  selectedField: FormElement | null = null;
 
   onDrop(event: CdkDragDrop<FormElement[]>) {
     if (event.previousContainer === event.container) {
-      moveItemInArray(this.formFields, event.previousIndex, event.currentIndex);
+      moveItemInArray(
+        event.container.data,
+        event.previousIndex,
+        event.currentIndex
+      );
     } else {
       const fieldData = event.item.data;
       const newField: FormElement = {
         ...fieldData,
-        id: `field-${Date.now()}`,
-        placeholder: this.getDefaultPlaceholder(fieldData.type)
+        id: `field-${Date.now()}`
       };
       this.formFields.splice(event.currentIndex, 0, newField);
     }
   }
 
-  private getDefaultPlaceholder(type: string): string {
-    const placeholders: { [key: string]: string } = {
-      'text': 'Escribe aquí...',
-      'email': 'correo@ejemplo.com',
-      'textarea': 'Escribe tu mensaje aquí...'
+  selectField(field: FormElement, event: Event) {
+    event.stopPropagation();
+    this.selectedField = field;
+    this.fieldSelected.emit(field);
+  }
+
+  openSettings(field: FormElement, event: Event) {
+    event.stopPropagation();
+    this.fieldSettingsRequested.emit(field);
+  }
+
+  duplicateField(field: FormElement, event: Event) {
+    event.stopPropagation();
+    const newField = {
+      ...field,
+      id: `field-${Date.now()}`
     };
-    return placeholders[type] || '';
+    const index = this.formFields.findIndex(f => f.id === field.id);
+    this.formFields.splice(index + 1, 0, newField);
+  }
+
+  removeField(index: number, event: Event) {
+    event.stopPropagation();
+    this.formFields.splice(index, 1);
+    if (this.selectedField && this.formFields.indexOf(this.selectedField) === -1) {
+      this.selectedField = null;
+      // @ts-ignore
+      this.fieldSelected.emit(null);
+    }
+  }
+
+  closeToolbar(event: Event) {
+    event.stopPropagation();
+    this.selectedField = null;
+    // @ts-ignore
+    this.fieldSelected.emit(null);
   }
 }

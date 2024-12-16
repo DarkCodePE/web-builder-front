@@ -6,23 +6,19 @@ import {FormElement} from '../../models/form-element.model';
   selector: 'app-toolbox',
   template: `
     <div class="toolbox-container">
-      <!-- Secciones del toolbox -->
       <div class="section" *ngFor="let section of sections">
-        <!-- Título de la sección -->
         <h3 class="section-title">
-          <mat-icon class="section-icon">
-            {{getSectionIcon(section)}}
-          </mat-icon>
+          <mat-icon class="section-icon">{{getSectionIcon(section)}}</mat-icon>
           {{section}}
         </h3>
 
-        <!-- Lista de elementos -->
         <div class="elements-list"
              cdkDropList
-             [cdkDropListConnectedTo]="['form-canvas']"
-             [cdkDropListData]="getElementsBySection(section)">
+             #toolboxList="cdkDropList"
+             id="toolboxList"
+             [cdkDropListData]="getElementsBySection(section)"
+             [cdkDropListConnectedTo]="['form-canvas-list']">
 
-          <!-- Elementos individuales -->
           <div *ngFor="let element of getElementsBySection(section)"
                class="element-item"
                cdkDrag
@@ -103,7 +99,7 @@ import {FormElement} from '../../models/form-element.model';
   standalone: false
 })
 export class ToolboxComponent {
-  sections = ['Contactos', 'General'];
+  sections = ['Contactos', 'General', 'Opciones'];
 
   formElements: FormElement[] = [
     // Sección General
@@ -139,6 +135,32 @@ export class ToolboxComponent {
       label: 'Email',
       section: 'Contactos',
       placeholder: 'correo@ejemplo.com'
+    },
+    // Sección Opciones
+    {
+      id: 'select',
+      type: 'select',
+      icon: 'arrow_drop_down_circle',
+      label: 'Lista desplegable',
+      section: 'Opciones',
+      placeholder: 'Selecciona una opción',
+      options: ['Opción 1', 'Opción 2', 'Opción 3']
+    },
+    {
+      id: 'checkbox',
+      type: 'checkbox',
+      icon: 'check_box',
+      label: 'Casillas de verificación',
+      section: 'Opciones',
+      options: ['Opción 1', 'Opción 2', 'Opción 3']
+    },
+    {
+      id: 'radio',
+      type: 'radio',
+      icon: 'radio_button_checked',
+      label: 'Opciones únicas',
+      section: 'Opciones',
+      options: ['Opción 1', 'Opción 2', 'Opción 3']
     }
   ];
 
@@ -149,7 +171,8 @@ export class ToolboxComponent {
   getSectionIcon(section: string): string {
     const sectionIcons: { [key: string]: string } = {
       'Contactos': 'contacts',
-      'General': 'dashboard'
+      'General': 'dashboard',
+      'Opciones': 'list'
     };
     return sectionIcons[section] || 'folder';
   }

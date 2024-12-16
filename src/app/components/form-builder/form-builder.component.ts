@@ -1,50 +1,66 @@
 import { Component } from '@angular/core';
-
-import { CdkDragDrop } from '@angular/cdk/drag-drop';
+import {FormElement} from '../../models/form-element.model';
 
 @Component({
   selector: 'app-form-builder',
   template: `
-    <div class="builder-container" cdkDropListGroup>
-      <app-toolbox class="toolbox"></app-toolbox>
-      <app-form-canvas class="canvas"></app-form-canvas>
-      <app-properties-panel class="properties"></app-properties-panel>
+    <div class="builder-container">
+      <div class="toolbox-section">
+        <app-toolbox></app-toolbox>
+      </div>
+      <div class="canvas-section">
+        <app-form-canvas
+          (fieldSelected)="onFieldSelected($event)"
+          (fieldSettingsRequested)="onFieldSettingsRequested($event)">
+        </app-form-canvas>
+      </div>
+      <div class="properties-section" *ngIf="showProperties">
+        <app-properties-panel
+          [selectedElement]="selectedField">
+        </app-properties-panel>
+      </div>
     </div>
   `,
   styles: [`
     .builder-container {
       display: grid;
       grid-template-columns: 250px 1fr 300px;
-      gap: 20px;
       height: 100vh;
-      max-height: 100vh;
-      padding: 20px;
       overflow: hidden;
-      background-color: #f5f5f5;
     }
 
-    .toolbox {
+    .toolbox-section {
+      border-right: 1px solid #e0e0e0;
       background: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      overflow: hidden;
+      height: 100%;
+      overflow-y: auto;
     }
 
-    .canvas {
-      overflow: hidden;
-      height: calc(100vh - 40px);
-      border-radius: 8px;
+    .canvas-section {
+      background: #f5f5f5;
+      height: 100%;
+      overflow-y: auto;
     }
 
-    .properties {
+    .properties-section {
+      border-left: 1px solid #e0e0e0;
       background: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      overflow: hidden;
+      height: 100%;
+      overflow-y: auto;
     }
   `],
   standalone: false
 })
 export class FormBuilderComponent {
-  // Lógica del componente principal
+  selectedField: FormElement | null = null;
+  showProperties = false;
+
+  onFieldSelected(field: FormElement | null) {
+    this.selectedField = field;
+  }
+
+  onFieldSettingsRequested(field: FormElement) {
+    this.selectedField = field;
+    this.showProperties = true;
+  }
 }
