@@ -1,6 +1,7 @@
 import {Component, ElementRef, EventEmitter, OnInit, Output, ViewChild} from '@angular/core';
 import {CdkDragDrop, CdkDragEnter, CdkDragMove, moveItemInArray, transferArrayItem} from '@angular/cdk/drag-drop';
 import { FormElement } from '../../models/form-element.model';
+import {FormStoreService} from '../../services/form-state.service';
 
 
 interface DropGuide {
@@ -17,24 +18,24 @@ interface DropGuide {
              cdkDropList
              #formCanvasList="cdkDropList"
              id="form-canvas-list"
-             [cdkDropListData]="formFields"
+             [cdkDropListData]="formStore.fields$ | async"
              [cdkDropListConnectedTo]="['toolboxList']"
              (cdkDropListDropped)="onDrop($event)">
 
           <!-- Mensaje cuando no hay campos -->
-          <div *ngIf="formFields.length === 0" class="empty-state">
+          <div *ngIf="(formStore.fields$ | async)?.length === 0" class="empty-state">
             <p>Arrastra elementos aquí para comenzar</p>
           </div>
 
-          <div *ngFor="let field of formFields; let i = index"
+          <div *ngFor="let field of formStore.fields$ | async"
                class="field-wrapper"
-               [class.selected]="selectedField?.id === field.id"
+               [class.selected]="(formStore.selectedField$ | async)?.id === field.id"
                (click)="selectField(field, $event)"
                cdkDrag
                [cdkDragData]="field">
 
             <!-- Barra de herramientas -->
-            <div class="field-toolbar" *ngIf="selectedField?.id === field.id">
+            <div class="field-toolbar" *ngIf="(formStore.selectedField$ | async)?.id === field.id">
               <div class="toolbar-group">
                 <button mat-icon-button matTooltip="Reordenar" cdkDragHandle>
                   <mat-icon>drag_indicator</mat-icon>
@@ -48,7 +49,7 @@ interface DropGuide {
                   <mat-icon>content_copy</mat-icon>
                 </button>
                 <button mat-icon-button matTooltip="Eliminar"
-                        (click)="removeField(i, $event)">
+                        (click)="removeField(field, $event)">
                   <mat-icon>delete</mat-icon>
                 </button>
               </div>
@@ -60,7 +61,7 @@ interface DropGuide {
               </button>
             </div>
 
-            <!-- Contenido del campo -->
+    <!-- Contenido del campo -->
             <div class="field-content" [ngSwitch]="field.type">
               <!-- Campo de texto -->
               <div *ngSwitchCase="'text'" class="form-field">
@@ -276,38 +277,40 @@ interface DropGuide {
   standalone: false
 })
 export class FormCanvasComponent {
-  @Output() fieldSelected = new EventEmitter<FormElement>();
-  @Output() fieldSettingsRequested = new EventEmitter<FormElement>();
+  constructor(public formStore: FormStoreService) {}
 
-  formFields: FormElement[] = [];
-  selectedField: FormElement | null = null;
+  onDrop(event: CdkDragDrop<FormElement[] | null>) {
+    if (!event.container.data) return;
 
-  onDrop(event: CdkDragDrop<FormElement[]>) {
     if (event.previousContainer === event.container) {
-      moveItemInArray(
-        event.container.data,
-        event.previousIndex,
-        event.currentIndex
-      );
+      const fields = [...event.container.data];
+      const [removed] = fields.splice(event.previousIndex, 1);
+      fields.splice(event.currentIndex, 0, removed);
+      this.formStore.reorderFields(fields);
     } else {
-      const fieldData = event.item.data;
+      const fieldData = event.item.data as FormElement;
       const newField: FormElement = {
         ...fieldData,
         id: `field-${Date.now()}`
       };
-      this.formFields.splice(event.currentIndex, 0, newField);
+
+      // Si no hay campos, inicializamos el array
+      const currentFields = event.container.data || [];
+      const updatedFields = [...currentFields];
+      updatedFields.splice(event.currentIndex, 0, newField);
+
+      this.formStore.reorderFields(updatedFields);
     }
   }
 
   selectField(field: FormElement, event: Event) {
     event.stopPropagation();
-    this.selectedField = field;
-    this.fieldSelected.emit(field);
+    this.formStore.selectField(field.id);
   }
 
   openSettings(field: FormElement, event: Event) {
     event.stopPropagation();
-    this.fieldSettingsRequested.emit(field);
+    this.formStore.selectField(field.id);
   }
 
   duplicateField(field: FormElement, event: Event) {
@@ -316,24 +319,20 @@ export class FormCanvasComponent {
       ...field,
       id: `field-${Date.now()}`
     };
-    const index = this.formFields.findIndex(f => f.id === field.id);
-    this.formFields.splice(index + 1, 0, newField);
+    this.formStore.addField(newField);
   }
 
-  removeField(index: number, event: Event) {
+  removeField(field: FormElement, event: Event) {
     event.stopPropagation();
-    this.formFields.splice(index, 1);
-    if (this.selectedField && this.formFields.indexOf(this.selectedField) === -1) {
-      this.selectedField = null;
-      // @ts-ignore
-      this.fieldSelected.emit(null);
+    this.formStore.removeField(field.id);
+    // Si el campo eliminado era el seleccionado, deseleccionamos
+    if ((this.formStore.selectedField$.getValue()?.id === field.id)) {
+      this.formStore.selectField(null);
     }
   }
 
   closeToolbar(event: Event) {
     event.stopPropagation();
-    this.selectedField = null;
-    // @ts-ignore
-    this.fieldSelected.emit(null);
+    this.formStore.selectField(null);
   }
 }

@@ -1,17 +1,26 @@
 import {Component, Input, OnChanges} from '@angular/core';
-import { FormStateService } from '../../services/form-state.service';
+import {FormStoreService} from '../../services/form-state.service';
 import { FormElement } from '../../models/form-element.model';
 import {fieldPropertiesConfig, FieldProperty} from '../../schemas/field-properties.config';
 
 @Component({
   selector: 'app-properties-panel',
   template: `
-    <div class="properties-panel" *ngIf="selectedElement">
+    <div class="properties-panel" *ngIf="formStore.selectedField$ | async as selectedElement">
       <div class="panel-header">
         <span class="title">Propiedades</span>
-        <button mat-icon-button (click)="closePanel()">
-          <mat-icon>close</mat-icon>
-        </button>
+        <div class="header-actions">
+          <button mat-button
+                  color="primary"
+                  [disabled]="!(formStore.isDirty$ | async)"
+                  (click)="saveChanges()">
+            <mat-icon>save</mat-icon>
+            Guardar
+          </button>
+          <button mat-icon-button (click)="closePanel()">
+            <mat-icon>close</mat-icon>
+          </button>
+        </div>
       </div>
 
       <div class="panel-content">
@@ -19,7 +28,7 @@ import {fieldPropertiesConfig, FieldProperty} from '../../schemas/field-properti
           <!-- Propiedades Generales -->
           <mat-tab label="General">
             <div class="properties-section">
-              <ng-container *ngFor="let prop of getPropertiesBySection('general')">
+              <ng-container *ngFor="let prop of getPropertiesBySection(selectedElement.type, 'general')">
                 <!-- Campo de texto -->
                 <div class="form-field" *ngIf="prop.type === 'text'">
                   <label [matTooltip]="prop.tooltip">
@@ -27,23 +36,23 @@ import {fieldPropertiesConfig, FieldProperty} from '../../schemas/field-properti
                     <mat-icon *ngIf="prop.tooltip" class="help-icon">help_outline</mat-icon>
                   </label>
                   <input [type]="prop.type"
-                         [ngModel]="getPropertyValue(prop.key)"
-                         (ngModelChange)="updateProperty(prop.key, $event)">
+                         [ngModel]="getPropertyValue(selectedElement, prop.key)"
+                         (ngModelChange)="updateProperty(selectedElement.id, prop.key, $event)">
                 </div>
 
                 <!-- Campo de área de texto -->
                 <div class="form-field" *ngIf="prop.type === 'textarea'">
                   <label>{{prop.label}}</label>
-                  <textarea [ngModel]="getPropertyValue(prop.key)"
-                            (ngModelChange)="updateProperty(prop.key, $event)"
+                  <textarea [ngModel]="getPropertyValue(selectedElement, prop.key)"
+                            (ngModelChange)="updateProperty(selectedElement.id, prop.key, $event)"
                             rows="3"></textarea>
                 </div>
 
                 <!-- Toggle -->
                 <div class="form-field" *ngIf="prop.type === 'toggle'">
                   <mat-slide-toggle
-                    [ngModel]="getPropertyValue(prop.key)"
-                    (ngModelChange)="updateProperty(prop.key, $event)">
+                    [checked]="getPropertyValue(selectedElement, prop.key)"
+                    (change)="updateProperty(selectedElement.id, prop.key, $event.checked)">
                     {{prop.label}}
                   </mat-slide-toggle>
                 </div>
@@ -52,15 +61,15 @@ import {fieldPropertiesConfig, FieldProperty} from '../../schemas/field-properti
                 <div class="form-field" *ngIf="prop.type === 'options'">
                   <label>{{prop.label}}</label>
                   <div class="options-list">
-                    <div *ngFor="let option of getPropertyValue(prop.key); let i = index"
+                    <div *ngFor="let option of getPropertyValue(selectedElement, prop.key); let i = index"
                          class="option-item">
                       <input [ngModel]="option"
-                             (ngModelChange)="updateOption(prop.key, i, $event)">
-                      <button mat-icon-button (click)="removeOption(prop.key, i)">
+                             (ngModelChange)="updateOptionAt(selectedElement.id, prop.key, i, $event)">
+                      <button mat-icon-button (click)="removeOption(selectedElement.id, prop.key, i)">
                         <mat-icon>delete</mat-icon>
                       </button>
                     </div>
-                    <button mat-stroked-button (click)="addOption(prop.key)">
+                    <button mat-stroked-button (click)="addOption(selectedElement.id, prop.key)">
                       <mat-icon>add</mat-icon> Agregar opción
                     </button>
                   </div>
@@ -72,12 +81,12 @@ import {fieldPropertiesConfig, FieldProperty} from '../../schemas/field-properti
           <!-- Validaciones -->
           <mat-tab label="Validación">
             <div class="properties-section">
-              <ng-container *ngFor="let prop of getPropertiesBySection('validation')">
+              <ng-container *ngFor="let prop of getPropertiesBySection(selectedElement.type, 'validation')">
                 <div class="form-field">
                   <label>{{prop.label}}</label>
                   <input [type]="prop.type"
-                         [ngModel]="getPropertyValue(prop.key)"
-                         (ngModelChange)="updateProperty(prop.key, $event)">
+                         [ngModel]="getPropertyValue(selectedElement, prop.key)"
+                         (ngModelChange)="updateProperty(selectedElement.id, prop.key, $event)">
                 </div>
               </ng-container>
             </div>
@@ -86,17 +95,17 @@ import {fieldPropertiesConfig, FieldProperty} from '../../schemas/field-properti
           <!-- Apariencia -->
           <mat-tab label="Apariencia">
             <div class="properties-section">
-              <ng-container *ngFor="let prop of getPropertiesBySection('appearance')">
+              <ng-container *ngFor="let prop of getPropertiesBySection(selectedElement.type, 'appearance')">
                 <div class="form-field">
                   <label>{{prop.label}}</label>
                   <ng-container [ngSwitch]="prop.type">
                     <input *ngSwitchCase="'number'"
                            type="number"
-                           [ngModel]="getPropertyValue(prop.key)"
-                           (ngModelChange)="updateProperty(prop.key, $event)">
+                           [ngModel]="getPropertyValue(selectedElement, prop.key)"
+                           (ngModelChange)="updateProperty(selectedElement.id, prop.key, $event)">
                     <mat-select *ngSwitchCase="'select'"
-                                [ngModel]="getPropertyValue(prop.key)"
-                                (ngModelChange)="updateProperty(prop.key, $event)">
+                                [ngModel]="getPropertyValue(selectedElement, prop.key)"
+                                (ngModelChange)="updateProperty(selectedElement.id, prop.key, $event)">
                       <mat-option *ngFor="let opt of prop.options"
                                   [value]="opt.value">
                         {{opt.label}}
@@ -207,63 +216,63 @@ import {fieldPropertiesConfig, FieldProperty} from '../../schemas/field-properti
   `],
   standalone: false
 })
-export class PropertiesPanelComponent implements OnChanges {
-  @Input() selectedElement: FormElement | null = null;
-  properties: any = {};
-  availableProperties: FieldProperty[] = [];
+export class PropertiesPanelComponent{
 
-  constructor(private formStateService: FormStateService) {}
+  constructor(public formStore: FormStoreService) {}
 
-  ngOnChanges() {
-    if (this.selectedElement) {
-      this.initializeProperties();
-    }
+  getPropertiesBySection(fieldType: string, section: string): FieldProperty[] {
+    return (fieldPropertiesConfig[fieldType] || []).filter(prop => prop.section === section);
   }
 
-  private initializeProperties() {
-    if (!this.selectedElement) return;
-
-    this.availableProperties = fieldPropertiesConfig[this.selectedElement.type] || [];
-    this.properties = {};
-
-    // Inicializar con valores por defecto
-    this.availableProperties.forEach(prop => {
-      // @ts-ignore
-      this.properties[prop.key] = this.selectedElement?.[prop.key] || prop.defaultValue;
-    });
+  getPropertyValue(field: FormElement, key: string): any {
+    // @ts-ignore
+    return field[key] ?? this.getDefaultValue(field.type, key);
   }
 
-  getPropertiesBySection(section: string): FieldProperty[] {
-    return this.availableProperties.filter(prop => prop.section === section);
+  getDefaultValue(type: string, key: string): any {
+    const property = fieldPropertiesConfig[type]?.find(p => p.key === key);
+    return property?.defaultValue;
   }
 
-  getPropertyValue(key: string): any {
-    return this.properties[key];
+  updateProperty(fieldId: string, key: string, value: any) {
+    this.formStore.updateFieldProperties(fieldId, { [key]: value });
   }
 
-  updateProperty(key: string, value: any) {
-    this.properties[key] = value;
-    this.formStateService.updateControl(this.selectedElement!.id, this.properties);
-  }
+  updateOptionAt(fieldId: string, key: string, index: number, value: string) {
+    const field = this.formStore.selectedField$.getValue();
+    if (!field) return;
 
-  updateOption(propKey: string, index: number, value: string) {
-    const options = [...this.properties[propKey]];
+    // @ts-ignore
+    const options = [...(field[key] || [])];
     options[index] = value;
-    this.updateProperty(propKey, options);
+    this.updateProperty(fieldId, key, options);
   }
 
-  addOption(propKey: string) {
-    const options = [...this.properties[propKey]];
+  addOption(fieldId: string, key: string) {
+    const field = this.formStore.selectedField$.getValue();
+    if (!field) return;
+
+    // @ts-ignore
+    const options = [...(field[key] || [])];
     options.push(`Opción ${options.length + 1}`);
-    this.updateProperty(propKey, options);
+    this.updateProperty(fieldId, key, options);
   }
 
-  removeOption(propKey: string, index: number) {
-    const options = [...this.properties[propKey]];
+  removeOption(fieldId: string, key: string, index: number) {
+    const field = this.formStore.selectedField$.getValue();
+    if (!field) return;
+
+    // @ts-ignore
+    const options = [...(field[key] || [])];
     options.splice(index, 1);
-    this.updateProperty(propKey, options);
+    this.updateProperty(fieldId, key, options);
   }
+
+  saveChanges() {
+    this.formStore.saveChanges();
+  }
+
   closePanel() {
-    this.selectedElement = null;
+    this.formStore.selectField(null);
   }
 }

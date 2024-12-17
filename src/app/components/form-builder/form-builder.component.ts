@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import {FormElement} from '../../models/form-element.model';
+import {FormStoreService} from '../../services/form-state.service';
 
 @Component({
   selector: 'app-form-builder',
@@ -9,15 +10,10 @@ import {FormElement} from '../../models/form-element.model';
         <app-toolbox></app-toolbox>
       </div>
       <div class="canvas-section">
-        <app-form-canvas
-          (fieldSelected)="onFieldSelected($event)"
-          (fieldSettingsRequested)="onFieldSettingsRequested($event)">
-        </app-form-canvas>
+        <app-form-canvas></app-form-canvas>
       </div>
-      <div class="properties-section" *ngIf="showProperties">
-        <app-properties-panel
-          [selectedElement]="selectedField">
-        </app-properties-panel>
+      <div class="properties-section" *ngIf="formStore.selectedField$ | async">
+        <app-properties-panel></app-properties-panel>
       </div>
     </div>
   `,
@@ -52,15 +48,5 @@ import {FormElement} from '../../models/form-element.model';
   standalone: false
 })
 export class FormBuilderComponent {
-  selectedField: FormElement | null = null;
-  showProperties = false;
-
-  onFieldSelected(field: FormElement | null) {
-    this.selectedField = field;
-  }
-
-  onFieldSettingsRequested(field: FormElement) {
-    this.selectedField = field;
-    this.showProperties = true;
-  }
+  constructor(public formStore: FormStoreService) {}
 }
